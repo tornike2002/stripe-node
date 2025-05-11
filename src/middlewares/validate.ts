@@ -14,6 +14,7 @@ export const validate =
             path: e.path.join("."),
           })),
         });
+        return;
       }
       next(error);
     }
