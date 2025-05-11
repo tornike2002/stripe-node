@@ -130,3 +130,32 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     res.status(401).json({ message: "Unauthorized" });
   }
 };
+
+export const getUserById = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const user = await User.findById(id);
+
+  if (!user) {
+    res.status(404).json({ message: "User not found" });
+    return;
+  }
+
+  try {
+    res.status(200).json({
+      id: user._id,
+      message: "User fetched successfully",
+      user: {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        stripeCustomerId: user.stripeCustomerId,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(500).json({ message: error.message });
+    } else {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+};
