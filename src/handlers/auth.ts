@@ -159,3 +159,92 @@ export const getUserById = async (req: Request, res: Response) => {
     }
   }
 };
+
+export const getUserByStripeCustomerId = async (
+  req: Request,
+  res: Response
+) => {
+  const { stripeCustomerId } = req.params;
+  try {
+    const user = await User.findOne({ stripeCustomerId });
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+    res.status(200).json({
+      userId: user._id,
+      message: "User fetched successfully",
+      user: {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        stripeCustomerId: user.stripeCustomerId,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(500).json({ message: error.message });
+    } else {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+};
+
+export const checkuserAccess = async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const courseId = req.query.courseId as string;
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    let hasAccess = false;
+
+    if (user.currentSubscriptionId) {
+      const subscription = await Subscription.findById(
+        user.currentSubscriptionId
+      );
+      if (subscription && subscription.status === "active") {
+        hasAccess = true;
+      }
+      res.status(200).json({
+        message: "User has access to the course",
+        hasAccess,
+        accessType: "subscription",
+        user: {
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+      });
+      return;
+    }
+    const purchase = await Purchases.findOne({
+      userId: user._id,
+      courseId: courseId,
+    });
+    if (purchase) {
+      hasAccess = true;
+      res.status(200).json({
+        message: "User has access to the course",
+        hasAccess,
+        accessType: "course",
+      });
+      return;
+    }
+    res.status(200).json({
+      message: "User does not have access to the course",
+      hasAccess,
+      accessType: "none",
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(500).json({ message: error.message });
+    } else {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+};
