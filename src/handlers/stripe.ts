@@ -9,8 +9,6 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
 
   const currentUser = await User.findById(userId);
 
-  //   TODO: add rate limiting for spamming checkout page
-
   const course = await Course.findById(courseId);
 
   if (!course) {
@@ -44,6 +42,63 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
     metadata: {
       courseId,
       userId: currentUser!._id.toString(),
+    },
+  });
+
+  res.status(200).json({ checkoutUrl: session.url });
+};
+
+export const createProPlanCheckoutSession = async (
+  req: Request,
+  res: Response
+) => {
+  const { planId } = req.params as { planId: "month" | "year" };
+  const { userId } = req;
+
+  if (!userId) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
+  }
+
+  const currentUser = await User.findById(userId);
+
+  if (!currentUser) {
+    res.status(404).json({ message: "User not found" });
+    return;
+  }
+
+  let priceId;
+  if (planId === "month") {
+    priceId = process.env.STRIPE_MONTHLY_PLAN_ID;
+  } else if (planId === "year") {
+    priceId = process.env.STRIPE_YEARLY_PLAN_ID;
+  } else {
+    res.status(400).json({ message: "Invalid plan id" });
+    return;
+  }
+  if (!priceId) {
+    res.status(400).json({ message: "Price id not found" });
+    return;
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    customer: currentUser.stripeCustomerId as string,
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ],
+    mode: "subscription",
+    success_url: `${
+      process.env.FRONTEND_URL
+    }/pro-plan?success?session_id={CHECKOUT_SESSION_ID}&year=${
+      planId === "year" ? "true" : "false"
+    }`,
+    cancel_url: `${process.env.FRONTEND_URL}/pro-plan`,
+    metadata: {
+      userId: currentUser._id.toString(),
+      planId,
     },
   });
 
