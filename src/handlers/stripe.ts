@@ -2,12 +2,19 @@ import { Request, Response } from "express";
 import User from "../models/User";
 import stripe from "../config/stripe";
 import Course from "../models/Courses";
-
+import rateLimit from "../module/ratelimit";
 export const createCheckoutSession = async (req: Request, res: Response) => {
   const { courseId } = req.params;
   const { userId } = req;
 
   const currentUser = await User.findById(userId);
+
+  const rateLimitKey = `checkout-rate-limit:${userId}`;
+  const { success } = await rateLimit.limit(rateLimitKey);
+
+  if (!success) {
+    throw new Error("Too many requests stop!");
+  }
 
   const course = await Course.findById(courseId);
 
@@ -65,6 +72,13 @@ export const createProPlanCheckoutSession = async (
   if (!currentUser) {
     res.status(404).json({ message: "User not found" });
     return;
+  }
+
+  const rateLimitKey = `pro-plan-checkout-rate-limit:${userId}`;
+  const { success } = await rateLimit.limit(rateLimitKey);
+
+  if (!success) {
+    throw new Error("Too many requests stop!");
   }
 
   let priceId;
