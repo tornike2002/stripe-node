@@ -104,3 +104,36 @@ export const createProPlanCheckoutSession = async (
 
   res.status(200).json({ checkoutUrl: session.url });
 };
+
+export const createBillingPortalSession = async (
+  req: Request,
+  res: Response
+) => {
+  const { userId } = req;
+
+  if (!userId) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
+  }
+
+  try {
+    const currentUser = await User.findById(userId);
+    if (!currentUser || !currentUser.stripeCustomerId) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: currentUser.stripeCustomerId,
+      return_url: `${process.env.FRONTEND_URL}/billing`,
+    });
+
+    res.status(200).json({ billingUrl: session.url });
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(500).json({ message: error.message });
+    } else {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+};

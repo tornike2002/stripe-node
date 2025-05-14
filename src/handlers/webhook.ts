@@ -89,6 +89,32 @@ export const stripeWebhook = async (req: Request, res: Response) => {
     }
   }
 
+  async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+    const subscriptionDoc = await Subscription.findOne({
+      stripeSubscriptionId: subscription.id,
+    });
+
+    if (!subscriptionDoc) {
+      throw new Error("Subscription not found");
+    }
+
+    const user = await User.findById(subscriptionDoc.userId);
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    await User.findByIdAndUpdate(user._id, {
+      $set: {
+        currentSubscriptionId: null,
+      },
+    });
+
+    await Subscription.findByIdAndDelete(subscriptionDoc._id);
+
+    res.status(200).json({ message: "Subscription cancelled successfully" });
+  }
+
   try {
     event = stripe.webhooks.constructEvent(
       body,
@@ -112,6 +138,11 @@ export const stripeWebhook = async (req: Request, res: Response) => {
         await handleSubscriptionUpsert(
           event.data.object as Stripe.Subscription,
           event.type
+        );
+        break;
+      case "customer.subscription.deleted":
+        await handleSubscriptionDeleted(
+          event.data.object as Stripe.Subscription
         );
         break;
       default:
